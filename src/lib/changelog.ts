@@ -8,6 +8,13 @@ export const CHANGELOG: ChangelogMonth[] = [
     month: "2026-09",
     entries: [
       {
+        version: "0.2.2",
+        date: "2026-09-13",
+        changes: [
+          "Set the default public URL to the GitHub Pages site for canonical links, Open Graph metadata and structured data.",
+        ],
+      },
+      {
         version: "0.2.1",
         date: "2026-09-13",
         changes: [
