@@ -8,6 +8,14 @@ export const CHANGELOG: ChangelogMonth[] = [
     month: "2026-09",
     entries: [
       {
+        version: "0.2.1",
+        date: "2026-09-13",
+        changes: [
+          "Fixed GitHub Pages deployment by using the included TeX runtime instead of downloading and rebuilding it.",
+          "Updated project Actions and corrected public URLs for hosting under a repository path.",
+        ],
+      },
+      {
         version: "0.2.0",
         date: "2026-09-13",
         changes: [

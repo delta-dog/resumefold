@@ -54,7 +54,7 @@ src/components/latex/          the studio, CodeMirror editor, pdf.js viewer
 
 `next build` writes a static site to `out/`. The browser TeX engine and trimmed runtime bundle are included in `public/tex/`, so a normal build includes local compilation. Run `npm run tex:bundle` when changing the TeX packages or rebuilding the engine.
 
-For Vercel, import the repository using the Next.js preset. `vercel.json` supplies `npm run build`; leave the output directory automatic and `BASE_PATH` unset. The project checks workflow runs lint, type checks and a production build for pushes and pull requests. The optional `pages.yml` workflow deploys to GitHub Pages only when started manually, setting `BASE_PATH=/<repo>` for project pages.
+For Vercel, import the repository using the Next.js preset. `vercel.json` supplies `npm run build`; leave the output directory automatic and `BASE_PATH` unset. The project checks workflow runs lint, type checks and a production build for pushes and pull requests. The optional `pages.yml` workflow deploys to GitHub Pages only when started manually, setting `BASE_PATH=/<repo>` and the public site URL for project pages. It uses the bundled TeX runtime without downloading TeX packages. In repository Settings → Pages, select GitHub Actions; then run Deploy to GitHub Pages from the Actions tab.
 
 On Vercel, the canonical URL and Open Graph metadata use the production domain automatically. For another host, set `NEXT_PUBLIC_SITE_URL` to the public site URL during the build. Set `repo` in `src/lib/site.ts` to show the source link in the footer and FAQ.
 

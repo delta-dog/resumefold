@@ -106,7 +106,7 @@ export function FloatingNav({ brand, items, cta }: { brand: string; items: NavIt
         <div id={menuId} hidden={!menuOpen} className="absolute inset-x-0 top-full mt-2 max-h-[calc(100dvh-88px-env(safe-area-inset-top))] overflow-y-auto rounded-[20px] border border-rule bg-paper p-2 shadow-[var(--shadow-pop)] lg:hidden">
           <nav aria-label="Mobile sections">
             {items.map((item) => (
-              <a key={item.href} href={item.href} aria-current={activeHref === item.href ? "location" : undefined} onClick={() => setMenuOpen(false)} className={`flex min-h-11 items-center rounded-xl px-3 text-sm font-medium ${activeHref === item.href ? "bg-paper-3 text-ink" : "text-ink-2 hover:bg-paper-3 hover:text-ink"}`}>
+              <a key={item.href} href={item.href.startsWith("/") && !item.href.startsWith("//") ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}${item.href}` : item.href} aria-current={activeHref === item.href ? "location" : undefined} onClick={() => setMenuOpen(false)} className={`flex min-h-11 items-center rounded-xl px-3 text-sm font-medium ${activeHref === item.href ? "bg-paper-3 text-ink" : "text-ink-2 hover:bg-paper-3 hover:text-ink"}`}>
                 {item.label}
               </a>
             ))}

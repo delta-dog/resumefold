@@ -19,21 +19,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      # The TeX engine + tree (~250 MB of downloads, trimmed to 43 MB) is cached between runs.
-      - uses: actions/cache@v4
-        with:
-          path: .tex-cache
-          key: tex-cache-${{ hashFiles('scripts/tex/build-bundle.mjs') }}
-      - run: npm run tex:bundle
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

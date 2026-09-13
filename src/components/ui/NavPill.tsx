@@ -64,7 +64,7 @@ export function NavPill({ items, activeHref = null, className = "", bare = false
         return (
           <a
             key={it.href}
-            href={it.href}
+            href={it.href.startsWith("/") && !it.href.startsWith("//") ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}${it.href}` : it.href}
             ref={(el) => {
               if (el) links.current.set(it.href, el);
               else links.current.delete(it.href);

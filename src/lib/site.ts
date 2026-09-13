@@ -6,7 +6,7 @@ export const SITE = {
   name: "ResumeFold",
   tagline: "Free, open-source resume builder. Gets past applicant tracking systems and still sounds like you.",
   /** Public URL of the deployed site (no trailing slash). Used for canonical / Open Graph. */
-  url: new URL(publicUrl).origin,
+  url: new URL(publicUrl).origin + (process.env.NEXT_PUBLIC_BASE_PATH ?? ""),
   /** Source repository. Shown in the footer and FAQ; leave empty to hide. */
   repo: "https://github.com/delta-dog/resumefold",
   license: "MIT",
