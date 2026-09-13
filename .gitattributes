@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.data binary
+*.wasm binary
+*.woff2 binary
+public/tex/busytex.js -text -diff
+*-OFL.txt -text
