@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useActiveResume, useResumeStore } from "@/lib/store";
 import { parseResumeText } from "@/lib/import/parse";
+import { ResumeReadError } from "@/lib/import/errors";
 
 export function ResumeUpload({ onImported }: { onImported: () => void }) {
   const current = useActiveResume();
@@ -11,6 +12,9 @@ export function ResumeUpload({ onImported }: { onImported: () => void }) {
   const controller = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [diagnostic, setDiagnostic] = useState("");
+  const [pasting, setPasting] = useState(false);
+  const [pasted, setPasted] = useState("");
   const [filename, setFilename] = useState("");
   const [text, setText] = useState("");
   const parsed = useMemo(() => text ? parseResumeText(text, filename) : null, [text, filename]);
@@ -20,14 +24,17 @@ export function ResumeUpload({ onImported }: { onImported: () => void }) {
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
-    setBusy(true); setError(""); setText(""); setFilename(file.name);
+    setBusy(true); setError(""); setDiagnostic(""); setText(""); setFilename(file.name); setPasting(false);
     const timeout = setTimeout(() => request.abort(new Error("Reading took too long. Try DOCX or TXT.")), 30000);
     try {
       const { extractResumeText } = await import("@/lib/import/extract");
       const extracted = await extractResumeText(file, request.signal);
       if (!request.signal.aborted) setText(extracted);
     } catch (error) {
-      if (controller.current === request) setError(request.signal.aborted ? "Reading cancelled or timed out. Try a smaller file, DOCX or TXT." : error instanceof TypeError || error instanceof ReferenceError ? "This browser could not read the file. Try a DOCX or TXT copy, or update your browser." : error instanceof Error ? error.message : "This file could not be read.");
+      if (controller.current === request) {
+        setError(request.signal.aborted ? "Reading cancelled or timed out. Try a smaller file or paste your resume text." : error instanceof Error ? error.message : "This file could not be read.");
+        setDiagnostic(error instanceof ResumeReadError ? error.diagnostic : "");
+      }
     } finally {
       clearTimeout(timeout);
       if (controller.current === request) setBusy(false);
@@ -43,6 +50,7 @@ export function ResumeUpload({ onImported }: { onImported: () => void }) {
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => input.current?.click()}>{busy ? "Reading resume…" : "Upload a resume"}</button>
+        {!busy && !parsed && <button type="button" className="btn btn-ghost btn-sm" aria-expanded={pasting} onClick={() => setPasting(!pasting)}>Paste text</button>}
         {busy && <button type="button" className="btn btn-ghost btn-sm" onClick={() => controller.current?.abort()}>Cancel</button>}
       </div>
       <input ref={input} type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className="hidden" aria-label="Resume file" onChange={(event) => {
@@ -51,6 +59,14 @@ export function ResumeUpload({ onImported }: { onImported: () => void }) {
         if (file) void read(file);
       }} />
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {diagnostic && <details className="min-w-0 text-xs text-ink-3"><summary className="flex min-h-11 cursor-pointer items-center">Error details</summary><p className="break-words">{diagnostic}</p></details>}
+      {pasting && <div className="grid gap-2">
+        <label htmlFor="paste-resume" className="text-sm">Resume text</label>
+        <textarea id="paste-resume" className="field" rows={6} maxLength={100000} value={pasted} onChange={(event) => setPasted(event.target.value)} placeholder="Copy and paste the text from your resume." />
+        <button type="button" className="btn btn-secondary btn-sm justify-self-start" disabled={pasted.trim().length < 20} onClick={() => {
+          setFilename("Pasted resume.txt"); setText(pasted.trim()); setPasted(""); setPasting(false); setError(""); setDiagnostic("");
+        }}>Use this text</button>
+      </div>}
       {parsed && (
         <div className="grid min-w-0 gap-3">
           <p className="break-all text-sm font-medium">{filename}</p>

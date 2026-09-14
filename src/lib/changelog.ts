@@ -8,6 +8,16 @@ export const CHANGELOG: ChangelogMonth[] = [
     month: "2026-09",
     entries: [
       {
+        version: "0.3.2",
+        date: "2026-09-14",
+        changes: [
+          "Added missing PDF compatibility support in both the reader and its worker for browsers without newer promise and buffer APIs.",
+          "Reworked file reading with cancellable native reads and clearer guidance for files unavailable on the device.",
+          "Added resume text paste with the same review, keyword matching and export flow.",
+          "Added optional error details and versioned PDF worker assets to help diagnose failures and avoid stale worker caches.",
+        ],
+      },
+      {
         version: "0.3.1",
         date: "2026-09-14",
         changes: [

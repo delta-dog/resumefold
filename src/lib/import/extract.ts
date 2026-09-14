@@ -1,10 +1,31 @@
 import { loadPdfJs } from "@/lib/pdf";
+import { ResumeReadError, type ImportStage } from "./errors";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_TEXT_LENGTH = 100000;
 const MAX_XML_BYTES = 2 * 1024 * 1024;
 function checkAborted(signal: AbortSignal) {
   if (signal.aborted) throw signal.reason ?? new Error("Reading cancelled.");
+}
+
+export function readFileBytes(file: File, signal: AbortSignal): Promise<ArrayBuffer> {
+  checkAborted(signal);
+  if (typeof FileReader === "undefined") return file.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    const cleanup = () => { signal.removeEventListener("abort", abort); reader.onload = reader.onerror = reader.onabort = null; };
+    const abort = () => { cleanup(); reader.abort(); reject(signal.reason ?? new Error("Reading cancelled.")); };
+    reader.onload = () => {
+      const result = reader.result;
+      cleanup();
+      if (result instanceof ArrayBuffer) resolve(result);
+      else reject(new Error("No file data was received. Choose the file again."));
+    };
+    reader.onerror = () => { cleanup(); reject(new Error("The file could not be opened. Download it to your device, then choose it again.")); };
+    reader.onabort = () => { cleanup(); reject(new Error("Reading cancelled.")); };
+    signal.addEventListener("abort", abort, { once: true });
+    try { reader.readAsArrayBuffer(file); } catch (error) { cleanup(); reject(error); }
+  });
 }
 type DocxStream = {
   on(event: "data", callback: (chunk: Uint8Array) => void): DocxStream;
@@ -97,9 +118,9 @@ function docxText(xml: string) {
   const document = new DOMParser().parseFromString(xml, "application/xml");
   if (document.getElementsByTagName("parsererror").length) throw new Error("This DOCX document is damaged.");
   const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-  return [...document.getElementsByTagNameNS(ns, "p")].map((paragraph) => {
+  return Array.from(document.getElementsByTagNameNS(ns, "p")).map((paragraph) => {
     let line = "";
-    for (const node of paragraph.getElementsByTagNameNS(ns, "*")) {
+    for (const node of Array.from(paragraph.getElementsByTagNameNS(ns, "*"))) {
       let parent = node.parentElement;
       while (parent && !(parent.namespaceURI === ns && parent.localName === "p")) parent = parent.parentElement;
       if (parent !== paragraph) continue;
@@ -113,53 +134,62 @@ function docxText(xml: string) {
 
 export async function extractResumeText(file: File, signal: AbortSignal): Promise<string> {
   const extension = validateResumeFile(file);
-  const buffer = await file.arrayBuffer();
-  checkAborted(signal);
-  if (extension === "txt") return checkText(new TextDecoder("utf-8", { fatal: true }).decode(buffer));
-  if (extension === "docx") {
-    const xml = await readDocxXml(buffer, signal);
-    checkAborted(signal);
-    return checkText(docxText(xml));
-  }
-  if (new TextDecoder().decode(buffer.slice(0, 5)) !== "%PDF-") throw new Error("This is not a valid PDF file.");
-  const pdfjs = await loadPdfJs();
-  checkAborted(signal);
-  const task = pdfjs.getDocument({ data: buffer, useSystemFonts: false });
-  const abort = () => { void task.destroy(); };
-  signal.addEventListener("abort", abort, { once: true });
+  let stage: ImportStage = "file-read";
   try {
-    const pdf = await task.promise;
-    if (pdf.numPages > 20) throw new Error("Choose a resume with no more than 20 pages.");
-    const pages: string[] = [];
-    let length = 0;
-    for (let i = 1; i <= pdf.numPages; i++) {
+    const buffer = await readFileBytes(file, signal);
+    checkAborted(signal);
+    if (extension === "txt") { stage = "text-decode"; return checkText(new TextDecoder("utf-8", { fatal: true }).decode(buffer)); }
+    if (extension === "docx") {
+      stage = "docx-read";
+      const xml = await readDocxXml(buffer, signal);
       checkAborted(signal);
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const lines: string[] = [];
-      let line = "";
-      let y: number | null = null;
-      for (const item of content.items) {
-        if (!("str" in item)) continue;
-        const nextY = item.transform[5];
-        if (y !== null && Math.abs(nextY - y) > 3 && line.trim()) { lines.push(line.trim()); line = ""; }
-        line += `${line && !line.endsWith(" ") ? " " : ""}${item.str}`;
-        y = nextY;
-        if (item.hasEOL) { lines.push(line.trim()); line = ""; y = null; }
-      }
-      if (line.trim()) lines.push(line.trim());
-      const text = lines.join("\n");
-      length += text.length;
-      if (length > MAX_TEXT_LENGTH) throw new Error("This PDF has too much text. Choose a shorter resume.");
-      pages.push(text);
-      page.cleanup();
+      return checkText(docxText(xml));
     }
-    return checkText(pages.join("\n\n"));
+    stage = "pdf-load";
+    if (new TextDecoder().decode(buffer.slice(0, 5)) !== "%PDF-") throw new Error("This is not a valid PDF file.");
+    const pdfjs = await loadPdfJs();
+    checkAborted(signal);
+    const task = pdfjs.getDocument({ data: buffer, useSystemFonts: false });
+    const abort = () => { void task.destroy().catch(() => {}); };
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      const pdf = await task.promise;
+      stage = "pdf-text";
+      if (pdf.numPages > 20) throw new Error("Choose a resume with no more than 20 pages.");
+      const pages: string[] = [];
+      let length = 0;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        checkAborted(signal);
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const lines: string[] = [];
+        let line = "";
+        let y: number | null = null;
+        for (const item of content.items) {
+          if (!("str" in item)) continue;
+          const nextY = item.transform[5];
+          if (y !== null && Math.abs(nextY - y) > 3 && line.trim()) { lines.push(line.trim()); line = ""; }
+          line += `${line && !line.endsWith(" ") ? " " : ""}${item.str}`;
+          y = nextY;
+          if (item.hasEOL) { lines.push(line.trim()); line = ""; y = null; }
+        }
+        if (line.trim()) lines.push(line.trim());
+        const text = lines.join("\n");
+        length += text.length;
+        if (length > MAX_TEXT_LENGTH) throw new Error("This PDF has too much text. Choose a shorter resume.");
+        pages.push(text);
+        page.cleanup();
+      }
+      return checkText(pages.join("\n\n"));
+    } catch (error) {
+      if (error instanceof Error && error.name === "PasswordException") throw new Error("This PDF is password-protected. Upload an unlocked copy.");
+      throw error;
+    } finally {
+      signal.removeEventListener("abort", abort);
+      await task.destroy().catch(() => {});
+    }
   } catch (error) {
-    if (error instanceof Error && error.name === "PasswordException") throw new Error("This PDF is password-protected. Upload an unlocked copy.");
-    throw error;
-  } finally {
-    signal.removeEventListener("abort", abort);
-    await task.destroy();
+    if (signal.aborted) throw signal.reason ?? new Error("Reading cancelled.");
+    throw new ResumeReadError(stage, error);
   }
 }
