@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy, PDFDocumentLoadingTask, RenderTask } from "pdfjs-dist";
+import { loadPdfJs } from "@/lib/pdf";
 
 const ZOOMS = [0.5, 0.67, 0.83, 1, 1.25, 1.5, 2];
 function availableWidth(element: HTMLElement | null) {
@@ -21,44 +22,51 @@ export function PdfViewer({ data, className = "" }: { data: ArrayBuffer | null; 
   const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState<number | null>(null); // null = fit width
   const [fit, setFit] = useState(1);
+  const [pageWidth, setPageWidth] = useState(0);
+  const [error, setError] = useState("");
 
   // Load the document
   useEffect(() => {
     if (!data) return;
     let cancelled = false;
+    let task: PDFDocumentLoadingTask | null = null;
     (async () => {
-      const pdfjs = await import("pdfjs-dist");
-      pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/vendor/pdf.worker.min.mjs`;
-      const d = await pdfjs.getDocument({ data: data.slice(0) }).promise;
-      if (cancelled) return;
-      setDoc((old) => {
-        old?.loadingTask.destroy();
-        return d;
-      });
-      setPages(d.numPages);
-      // fit-to-width scale from page 1
-      const p1 = await d.getPage(1);
-      const vw = p1.getViewport({ scale: 1 }).width;
-      const w = availableWidth(scroller.current);
-      if (!cancelled) setFit(Math.max(0.3, Math.min(2, w / vw)));
+      try {
+        const pdfjs = await loadPdfJs();
+        if (cancelled) return;
+        setError("");
+        setDoc(null);
+        task = pdfjs.getDocument({ data: data.slice(0) });
+        const d = await task.promise;
+        const p1 = await d.getPage(1);
+        if (cancelled) return;
+        const vw = p1.getViewport({ scale: 1 }).width;
+        setPageWidth(vw);
+        setFit(Math.max(0.3, Math.min(2, availableWidth(scroller.current) / vw)));
+        setDoc(d);
+        setPages(d.numPages);
+        setPage(1);
+      } catch {
+        if (!cancelled) setError("The PDF preview could not be loaded. Try recompiling or download the PDF.");
+        await task?.destroy().catch(() => {});
+      }
     })();
     return () => {
       cancelled = true;
+      void task?.destroy().catch(() => {});
     };
   }, [data]);
 
   // Re-fit when the pane changes size (layout switch, window resize)
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !doc) return;
-    const ro = new ResizeObserver(async () => {
-      const p1 = await doc.getPage(1);
-      const vw = p1.getViewport({ scale: 1 }).width;
-      setFit(Math.max(0.3, Math.min(2, availableWidth(el) / vw)));
+    if (!el || !pageWidth) return;
+    const ro = new ResizeObserver(() => {
+      setFit(Math.max(0.3, Math.min(2, availableWidth(el) / pageWidth)));
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [doc]);
+  }, [pageWidth]);
 
   const scale = (zoom ?? fit) * (typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1);
   const cssScale = zoom ?? fit;
@@ -67,21 +75,25 @@ export function PdfViewer({ data, className = "" }: { data: ArrayBuffer | null; 
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const onScroll = () => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
       const canvases = el.querySelectorAll<HTMLElement>("[data-page]");
+      const midpoint = el.getBoundingClientRect().top + el.clientHeight / 2;
       let cur = 1;
       for (const c of canvases) {
-        if (c.offsetTop - el.scrollTop < el.clientHeight / 2) cur = Number(c.dataset.page);
+        if (c.getBoundingClientRect().top < midpoint) cur = Number(c.dataset.page);
       }
       setPage(cur);
     };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    return () => { cancelAnimationFrame(frame); el.removeEventListener("scroll", onScroll); };
   }, [pages]);
 
   const goTo = (n: number) => {
     const el = scroller.current?.querySelector<HTMLElement>(`[data-page="${n}"]`);
-    el?.scrollIntoView({ block: "start", behavior: "smooth" });
+    el?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   };
   const zoomStep = (dir: 1 | -1) => {
     const cur = zoom ?? fit;
@@ -91,7 +103,7 @@ export function PdfViewer({ data, className = "" }: { data: ArrayBuffer | null; 
 
   return (
     <div className={`flex h-full min-h-0 flex-col ${className}`}>
-      <div className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-rule/60 bg-paper px-2 text-xs sm:h-10 sm:min-h-0">
+      <div className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-rule/60 bg-paper px-2 text-xs">
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <button type="button" className="btn btn-ghost btn-icon" onClick={() => goTo(Math.max(1, page - 1))} disabled={page <= 1} aria-label="Previous page">
             ↑
@@ -114,8 +126,8 @@ export function PdfViewer({ data, className = "" }: { data: ArrayBuffer | null; 
           </button>
         </div>
       </div>
-      <div ref={scroller} className="min-h-0 flex-1 overflow-auto overscroll-contain scroll-thin bg-paper-3 p-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:p-6">
-        {doc ? (
+      <div ref={scroller} data-pdf-scroller className="min-h-0 flex-1 overflow-auto overscroll-contain scroll-thin bg-paper-3 p-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:p-6">
+        {error ? <p role="alert" className="p-4 text-sm text-danger">{error}</p> : doc ? (
           <div className="mx-auto flex w-max flex-col gap-4">
             {Array.from({ length: pages }, (_, i) => (
               <PageCanvas key={i + 1} doc={doc} n={i + 1} scale={scale} cssScale={cssScale} />
@@ -131,27 +143,43 @@ export function PdfViewer({ data, className = "" }: { data: ArrayBuffer | null; 
 
 function PageCanvas({ doc, n, scale, cssScale }: { doc: PDFDocumentProxy; n: number; scale: number; cssScale: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [error, setError] = useState("");
   useEffect(() => {
-    let task: { cancel: () => void } | null = null;
+    const canvas = ref.current;
+    if (!canvas) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { root: canvas.closest("[data-pdf-scroller]"), rootMargin: "300px" });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    let task: RenderTask | null = null;
     let cancelled = false;
     (async () => {
-      const p = await doc.getPage(n);
-      const vp = p.getViewport({ scale });
-      const canvas = ref.current;
-      if (!canvas || cancelled) return;
-      canvas.width = vp.width;
-      canvas.height = vp.height;
-      const ratio = cssScale / scale;
-      canvas.style.width = `${vp.width * ratio}px`;
-      canvas.style.height = `${vp.height * ratio}px`;
-      const ctx = canvas.getContext("2d")!;
-      task = p.render({ canvasContext: ctx, viewport: vp, canvas });
-      await (task as unknown as { promise: Promise<void> }).promise.catch(() => {});
+      try {
+        const p = await doc.getPage(n);
+        const vp = p.getViewport({ scale });
+        const canvas = ref.current;
+        if (!canvas || cancelled) return;
+        const ratio = cssScale / scale;
+        canvas.style.width = `${vp.width * ratio}px`;
+        canvas.style.height = `${vp.height * ratio}px`;
+        if (!visible) { canvas.width = 0; canvas.height = 0; return; }
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas is not available.");
+        task = p.render({ canvasContext: ctx, viewport: vp, canvas });
+        await task.promise;
+        if (!cancelled) setError("");
+      } catch {
+        if (!cancelled) setError("This page could not be rendered. Try downloading the PDF.");
+      }
     })();
     return () => {
       cancelled = true;
       task?.cancel();
     };
-  }, [doc, n, scale, cssScale]);
-  return <canvas ref={ref} data-page={n} className="bg-white" style={{ boxShadow: "var(--shadow-sheet)" }} />;
+  }, [doc, n, scale, cssScale, visible]);
+  return <div className="relative" data-page={n}><canvas ref={ref} aria-label={`PDF page ${n}`} className="block bg-white" style={{ boxShadow: "var(--shadow-sheet)" }} />{error && <p role="alert" className="absolute inset-x-0 top-0 bg-paper p-3 text-sm text-danger">{error}</p>}</div>;
 }

@@ -1,6 +1,11 @@
+import { loadPdfJs } from "@/lib/pdf";
+
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_TEXT_LENGTH = 100000;
 const MAX_XML_BYTES = 2 * 1024 * 1024;
+function checkAborted(signal: AbortSignal) {
+  if (signal.aborted) throw signal.reason ?? new Error("Reading cancelled.");
+}
 type DocxStream = {
   on(event: "data", callback: (chunk: Uint8Array) => void): DocxStream;
   on(event: "error", callback: (error: unknown) => void): DocxStream;
@@ -13,7 +18,7 @@ export async function readDocxXml(buffer: ArrayBuffer, signal: AbortSignal) {
   validateDocxArchive(buffer);
   const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(buffer);
-  signal.throwIfAborted();
+  checkAborted(signal);
   const entry = zip.file("word/document.xml")!;
   const stream = (entry as typeof entry & { internalStream(type: "uint8array"): DocxStream }).internalStream("uint8array");
   return new Promise<string>((resolve, reject) => {
@@ -109,17 +114,16 @@ function docxText(xml: string) {
 export async function extractResumeText(file: File, signal: AbortSignal): Promise<string> {
   const extension = validateResumeFile(file);
   const buffer = await file.arrayBuffer();
-  signal.throwIfAborted();
+  checkAborted(signal);
   if (extension === "txt") return checkText(new TextDecoder("utf-8", { fatal: true }).decode(buffer));
   if (extension === "docx") {
     const xml = await readDocxXml(buffer, signal);
-    signal.throwIfAborted();
+    checkAborted(signal);
     return checkText(docxText(xml));
   }
   if (new TextDecoder().decode(buffer.slice(0, 5)) !== "%PDF-") throw new Error("This is not a valid PDF file.");
-  const pdfjs = await import("pdfjs-dist");
-  signal.throwIfAborted();
-  pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/vendor/pdf.worker.min.mjs`;
+  const pdfjs = await loadPdfJs();
+  checkAborted(signal);
   const task = pdfjs.getDocument({ data: buffer, useSystemFonts: false });
   const abort = () => { void task.destroy(); };
   signal.addEventListener("abort", abort, { once: true });
@@ -129,7 +133,7 @@ export async function extractResumeText(file: File, signal: AbortSignal): Promis
     const pages: string[] = [];
     let length = 0;
     for (let i = 1; i <= pdf.numPages; i++) {
-      signal.throwIfAborted();
+      checkAborted(signal);
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
       const lines: string[] = [];

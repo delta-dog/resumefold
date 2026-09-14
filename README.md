@@ -1,5 +1,7 @@
 # ResumeFold
 
+Browser support and device-specific handling are documented in [docs/browser-compatibility.md](docs/browser-compatibility.md).
+
 **A free, open-source resume builder. It gets you past applicant tracking systems and still sounds like you.**
 
 Upload an existing PDF, DOCX or TXT, or type your details once. Review the live preview, run the ATS check, then export an ATS-friendly **PDF** or **DOCX**, or open the same resume in **Overleaf** as LaTeX. No account, no AI, no server. It's a static site; your drafts live in your browser.

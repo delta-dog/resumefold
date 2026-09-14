@@ -27,7 +27,7 @@ export function ResumeUpload({ onImported }: { onImported: () => void }) {
       const extracted = await extractResumeText(file, request.signal);
       if (!request.signal.aborted) setText(extracted);
     } catch (error) {
-      if (controller.current === request) setError(request.signal.aborted ? "Reading cancelled or timed out. Try a smaller file, DOCX or TXT." : error instanceof Error ? error.message : "This file could not be read.");
+      if (controller.current === request) setError(request.signal.aborted ? "Reading cancelled or timed out. Try a smaller file, DOCX or TXT." : error instanceof TypeError || error instanceof ReferenceError ? "This browser could not read the file. Try a DOCX or TXT copy, or update your browser." : error instanceof Error ? error.message : "This file could not be read.");
     } finally {
       clearTimeout(timeout);
       if (controller.current === request) setBusy(false);

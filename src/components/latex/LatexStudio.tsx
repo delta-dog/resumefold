@@ -1,5 +1,7 @@
 "use client";
 
+import { StorageNotice } from "@/components/workspace/StorageNotice";
+
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LatexEditor, type LatexEditorHandle } from "./LatexEditor";
@@ -230,7 +232,7 @@ function Studio() {
   };
 
   return (
-    <div className="flex h-dvh min-w-0 flex-col overflow-hidden bg-paper">
+    <div className="device-safe flex h-dvh min-w-0 flex-col overflow-hidden bg-paper">
       {/* ---------------------------------------------------------------- Top bar */}
       <header className="flex shrink-0 flex-wrap items-center gap-1 border-b border-rule/60 px-2 pb-2 pt-[max(8px,env(safe-area-inset-top))] lg:h-14 lg:flex-nowrap lg:gap-2 lg:px-3 lg:py-0">
         <Link href="/build" className="btn btn-ghost btn-sm px-3 lg:px-4" title="Back to the builder" aria-label="Back to the builder">
@@ -350,6 +352,7 @@ function Studio() {
         </div>
         <div className="hidden lg:block"><ThemeToggle compact /></div>
       </header>
+      <StorageNotice />
 
       {/* ---------------------------------------------------------------- Banners */}
       {askRemote && (

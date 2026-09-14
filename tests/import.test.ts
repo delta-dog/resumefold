@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
+import { spawnSync } from "node:child_process";
+import { resumePdf } from "./pdf-fixture";
 import { parseImportDate, parseResumeText } from "../src/lib/import/parse";
 import { MAX_FILE_BYTES, readDocxXml, validateResumeFile, validateDocxArchive } from "../src/lib/import/extract";
 
@@ -85,4 +87,26 @@ test("accepts DOCX document text and refuses oversized compressed XML", async ()
   const view = new DataView(huge);
   for (let offset = 0; offset < huge.byteLength - 46; offset++) if (view.getUint32(offset, true) === 0x02014b50) { view.setUint32(offset + 24, 1, true); break; }
   await assert.rejects(readDocxXml(huge, new AbortController().signal), /too large/);
+});
+
+test("reads PDFs when native iterator helpers are missing on mobile browsers", () => {
+  const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    import { loadPdfJs } from "./src/lib/pdf.ts";
+    globalThis.Iterator = undefined;
+    globalThis.DOMMatrix = class DOMMatrix {};
+    globalThis.Path2D = class Path2D {};
+    await assert.rejects(import("pdfjs-dist/build/pdf.mjs"), /prototype|Iterator/);
+    const pdfjs = await loadPdfJs();
+    assert.equal(typeof Iterator, "function");
+    assert.match(pdfjs.GlobalWorkerOptions.workerSrc, /pdf.worker.legacy.min.mjs$/);
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL("./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).href;
+    const task = pdfjs.getDocument({data: Uint8Array.from(Buffer.from(process.argv[1], "base64"))});
+    try {
+      const doc = await task.promise;
+      const content = await (await doc.getPage(1)).getTextContent();
+      assert.match(content.items.map(item => item.str ?? "").join(" "), /John Doe.*Python SQL/);
+    } finally { await task.destroy(); }
+  `, Buffer.from(resumePdf()).toString("base64")], { encoding: "utf8", timeout: 15000 });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });

@@ -15,7 +15,7 @@ const dateFormat = new Intl.DateTimeFormat("en", { day: "numeric", month: "short
 
 export default function ChangelogPage() {
   return (
-    <div className="min-h-dvh">
+    <div className="device-safe min-h-dvh">
       <FloatingNav brand={SITE.name} items={[
         { href: "/", label: "Home" },
         { href: "/#templates", label: "Templates" },

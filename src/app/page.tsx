@@ -85,7 +85,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-dvh">
+    <div className="device-safe min-h-dvh">
       <link rel="stylesheet" href={RESUME_FONTS_URL} />
       <style dangerouslySetInnerHTML={{ __html: RESUME_CSS }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

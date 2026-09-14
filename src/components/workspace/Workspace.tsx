@@ -19,6 +19,7 @@ import { DraftsMenu } from "./DraftsMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { ResumeUpload } from "./ResumeUpload";
 import { useSessionNickname } from "@/lib/session";
+import { StorageNotice } from "./StorageNotice";
 
 export function Workspace() {
   const [step, setStep] = useState<StepId>("template");
@@ -46,8 +47,9 @@ export function Workspace() {
   }
 
   return (
-    <div className="flex h-dvh min-w-0 flex-col overflow-hidden">
+    <div className="device-safe flex h-dvh min-w-0 flex-col overflow-hidden">
       <Header />
+      <StorageNotice />
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[232px_minmax(420px,640px)_minmax(0,1fr)] lg:grid-rows-1">
         {/* Rail */}
         <aside className="min-w-0 border-b border-rule/60 py-2 lg:border-b-0 lg:py-4 lg:pr-2">
@@ -65,7 +67,7 @@ export function Workspace() {
             {step === "template" && nickname && <p className="mt-3 text-xs text-ink-3">Welcome, <span className="font-medium text-ink-2">{nickname}</span>. Let’s get your resume ready.</p>}
             <div className="mt-7">
               {step === "template" && <div className="grid gap-7"><ResumeUpload onImported={() => setStep("review")} /><StepTemplate onSelect={() => {
-                if (window.matchMedia("(max-width: 767px)").matches) setStep("basics");
+                if (window.matchMedia("(max-width: 767px), (pointer: coarse)").matches) setStep("basics");
               }} /></div>}
               {step === "basics" && <StepBasics />}
               {step === "experience" && <StepExperience />}
@@ -96,7 +98,7 @@ export function Workspace() {
         {/* Preview — a column on large screens, an overlay below that */}
         <section
           className={`min-h-0 min-w-0 overflow-hidden bg-paper-3 lg:m-2 lg:ml-0 lg:block lg:rounded-card ${
-            previewOpen ? "fixed inset-0 z-40 flex flex-col" : "hidden"
+            previewOpen ? "device-safe fixed inset-0 z-40 flex flex-col" : "hidden"
           }`}
           aria-label="Live preview"
         >

@@ -157,6 +157,8 @@
 html {
   background: var(--paper);
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 body {
   background: var(--paper);
@@ -233,7 +235,7 @@ textarea.field { resize: vertical; min-height: 96px; }
 .btn-ghost:hover { background: var(--paper-3); color: var(--ink); }
 .btn-sm { height: 36px; padding: 0 16px; font-size: 13px; }
 .btn-icon { width: 36px; height: 36px; padding: 0; border-radius: 50%; }
-@media (max-width: 639px) {
+@media (max-width: 1023px), (pointer: coarse) {
   .field { min-width: 0; font-size: 16px; }
   .cm-editor { font-size: 16px !important; }
   .btn-sm { min-height: 44px; }
@@ -286,6 +288,11 @@ textarea.field { resize: vertical; min-height: 96px; }
 .template-art {
   block-size: 262px;
   content-visibility: auto;
+}
+
+.device-safe {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 @media (max-width: 1023px), (pointer: coarse), (prefers-reduced-motion: reduce) {

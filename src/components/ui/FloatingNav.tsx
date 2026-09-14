@@ -71,7 +71,7 @@ export function FloatingNav({ brand, items, cta }: { brand: string; items: NavIt
   }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-3 sm:px-6" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center pl-[max(12px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))] sm:pl-[max(24px,env(safe-area-inset-left))] sm:pr-[max(24px,env(safe-area-inset-right))]" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
       <header
         ref={header}
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false); }}

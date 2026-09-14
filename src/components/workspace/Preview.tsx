@@ -54,7 +54,7 @@ export function Preview({ resume, lift = false }: { resume: Resume; lift?: boole
     const target = exact ?? el.querySelector<HTMLElement>(`[data-field^="${CSS.escape(focused)}"]`);
     if (target) {
       target.classList.add("rs-hi");
-      target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      target.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
     }
   }, [focused, resume]);
 

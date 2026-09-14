@@ -8,6 +8,18 @@ export const CHANGELOG: ChangelogMonth[] = [
     month: "2026-09",
     entries: [
       {
+        version: "0.3.1",
+        date: "2026-09-14",
+        changes: [
+          "Fixed mobile PDF uploads by using the PDF reader and worker with browser compatibility support.",
+          "Kept file cancellation compatible with older browsers and replaced raw browser errors with useful guidance.",
+          "Kept the editor usable when browser storage is blocked, full or unreadable, with a visible backup reminder.",
+          "Improved tablet touch controls, landscape safe areas and text sizing across devices.",
+          "Reduced PDF preview memory use by rendering nearby pages and cleaning up replaced documents.",
+          "Improved mobile download handling and respected reduced-motion settings in previews.",
+        ],
+      },
+      {
         version: "0.3.0",
         date: "2026-09-14",
         changes: [

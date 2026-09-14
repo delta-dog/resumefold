@@ -8,7 +8,8 @@ ResumeFold's own code is MIT licensed (see LICENSE). The deployed site also ship
 |---|---|---|
 | [Next.js](https://nextjs.org) / [React](https://react.dev) | the application framework | MIT |
 | [CodeMirror 6](https://codemirror.net) (`@codemirror/*`, `@lezer/*`) | the LaTeX studio's editor | MIT |
-| [pdf.js](https://mozilla.github.io/pdf.js/) (`pdfjs-dist`) | renders compiled PDFs in the studio | Apache-2.0 |
+| [pdf.js](https://mozilla.github.io/pdf.js/) (`pdfjs-dist`) | extracts uploaded PDF text and renders compiled PDFs in the studio | Apache-2.0 |
+| [core-js](https://github.com/zloirock/core-js) | compatibility code included in PDF.js's legacy reader and worker; license notice in `public/licenses/core-js-LICENSE.txt` | MIT |
 | [docx](https://github.com/dolanmiu/docx) | builds the DOCX export | MIT |
 | [JSZip](https://stuk.github.io/jszip/) | builds the .zip export | MIT or GPL-3.0 (used under MIT) |
 | [Zod](https://zod.dev), [Zustand](https://zustand.docs.pmnd.rs), [Immer](https://immerjs.github.io/immer/), [nanoid](https://github.com/ai/nanoid) | data model and state | MIT |

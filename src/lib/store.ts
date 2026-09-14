@@ -6,6 +6,7 @@ import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
 import { emptyResume, parseResume, type Resume } from "./schema";
 import { sampleResume } from "./sample";
+import { draftStorage } from "./storage";
 
 export type Draft = {
   id: string;
@@ -149,7 +150,7 @@ export const useResumeStore = create<ResumeStore>()(
     })),
     {
       name: "byr:drafts:v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(draftStorage),
       partialize: (s) => ({ drafts: s.drafts, activeId: s.activeId }),
       merge: (persisted, current) => {
         const p = persisted as Partial<State> | undefined;
@@ -167,7 +168,10 @@ export const useResumeStore = create<ResumeStore>()(
         const activeId = p.activeId && drafts[p.activeId] ? p.activeId : Object.keys(drafts)[0];
         return { ...current, drafts, activeId };
       },
-      onRehydrateStorage: () => (state) => state?.setHydrated(),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.setHydrated();
+        else queueMicrotask(() => useResumeStore.getState().setHydrated());
+      },
     },
   ),
 );

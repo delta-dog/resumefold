@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { resilientStorage, type StorageIssue } from "../src/lib/storage";
 import { containsKeyword, keywordMatch, suggestKeywords } from "../src/lib/ats/check";
 import { emptyResume, parseResume } from "../src/lib/schema";
 
@@ -83,4 +85,42 @@ test("analysis survives draft changes, duplication and storage rehydration", asy
   assert.equal(store.getState().drafts[copyId].resume.meta.analysis.jobDescription, "Python and SQL developer");
   await store.persist.rehydrate();
   assert.equal(store.getState().drafts[copyId].resume.meta.analysis.keywords, "Python, SQL");
+});
+
+test("blocked storage and storage quota failures keep current drafts in memory", () => {
+  const issues: StorageIssue[] = [];
+  const blocked = resilientStorage(() => { throw new Error("Storage blocked"); }, (issue) => issues.push(issue));
+  assert.equal(blocked.getItem("draft"), null);
+  blocked.setItem("draft", '{"name":"John Doe"}');
+  assert.equal(blocked.getItem("draft"), '{"name":"John Doe"}');
+  assert.deepEqual(issues, ["unavailable"]);
+  const full = resilientStorage(() => ({ getItem: () => null, setItem: () => { throw new DOMException("Full", "QuotaExceededError"); }, removeItem: () => {} }), (issue) => issues.push(issue));
+  full.setItem("draft", '{"keywords":"SQL"}');
+  assert.equal(full.getItem("draft"), '{"keywords":"SQL"}');
+  assert.equal(issues.at(-1), "full");
+});
+
+test("corrupt stored JSON is preserved while new changes use memory", () => {
+  let original = "broken JSON";
+  const issues: StorageIssue[] = [];
+  const storage = resilientStorage(() => ({ getItem: () => original, setItem: (_, value) => { original = value; }, removeItem: () => { original = ""; } }), (issue) => issues.push(issue));
+  assert.equal(storage.getItem("draft"), null);
+  storage.setItem("draft", '{"name":"John Doe"}');
+  assert.equal(storage.getItem("draft"), '{"name":"John Doe"}');
+  assert.equal(original, "broken JSON");
+  assert.deepEqual(issues, ["unreadable"]);
+});
+
+test("the editor finishes hydration when browser storage access throws", () => {
+  const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    globalThis.window = {};
+    Object.defineProperty(globalThis, "localStorage", { get() { throw new Error("Storage blocked"); } });
+    const { useResumeStore: store } = await import("./src/lib/store.ts");
+    assert.equal(store.getState().hydrated, true);
+    store.getState().update(r => { r.meta.analysis.keywords = "SQL"; });
+    const state = store.getState();
+    assert.equal(state.drafts[state.activeId].resume.meta.analysis.keywords, "SQL");
+  `], { encoding: "utf8", timeout: 10000 });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });

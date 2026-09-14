@@ -4,6 +4,8 @@
 
 ResumeFold reads PDF, DOCX and UTF-8 TXT locally. PDF.js and JSZip are loaded on demand; no new service, API key, AI model or parsing dependency is needed. The user reviews extracted text before creating a new draft. Existing drafts remain available.
 
+PDF loading uses PDF.js's official legacy build and its matching worker. Both include compatibility support for JavaScript APIs missing from some mobile Safari versions. The worker has a separate filename so an older cached modern worker is not reused. File cancellation checks the signal directly without requiring `AbortSignal.throwIfAborted`.
+
 Contact details and standard section headings are recognised with deterministic rules. Entries with clear date ranges become editable fields. Year-only or ambiguous dates are left blank instead of inventing months. Unsupported sections and unmapped text remain in Import notes and JSON backups. Users must place that text in the appropriate fields before exporting. Original formatting is not preserved.
 
 The comparison can use the edited draft or the original extracted text. The structural checklist describes the formatted draft, not the uploaded document. A successful upload does not certify the original file's ATS compatibility.
@@ -29,4 +31,5 @@ Job descriptions, selected keywords and comparison preferences are part of each 
 - [Greenhouse: unsuccessful resume parsing](https://support.greenhouse.io/hc/en-us/articles/200989175-Unsuccessful-resume-parse) documents failures caused by image resumes, complex layouts and contact details placed in headers, footers or text boxes. This supports editable extraction and explicit limitations.
 - [Jobscan's matching guide](https://www.jobscan.co/jobscan-tutorial) describes comparisons against the job description, skills and keyword context. ResumeFold uses transparent local rules and does not reproduce its proprietary scoring.
 - [PDF.js API](https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html) provides browser PDF loading and text content extraction.
+- [PDF.js browser support](https://github.com/mozilla/pdf.js/wiki/Frequently-Asked-Questions#faq-support) recommends the legacy build for browser compatibility.
 - [JSZip loadAsync](https://stuk.github.io/jszip/documentation/api_jszip/load_async.html), [internalStream](https://stuk.github.io/jszip/documentation/api_zipobject/internal_stream.html) and [StreamHelper](https://stuk.github.io/jszip/documentation/api_streamhelper.html) document selective archive reading and pausable streams.
