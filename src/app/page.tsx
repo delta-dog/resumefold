@@ -15,6 +15,10 @@ import { SITE } from "@/lib/site";
 
 const FAQ: { q: string; a: string }[] = [
   {
+    q: "Can I upload my existing resume?",
+    a: "Yes. Upload a PDF, DOCX or TXT in the builder, review the extracted fields, then compare it with a job posting and export. Reading happens on this device. Scanned PDFs need selectable text first.",
+  },
+  {
     q: "Is it free?",
     a: "Yes. Every layout and export is free, with no trial, subscription or watermark.",
   },

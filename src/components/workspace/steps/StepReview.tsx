@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { checkResume, keywordMatch, type Issue } from "@/lib/ats/check";
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { checkResume, keywordMatch, suggestKeywords, type Issue } from "@/lib/ats/check";
 import { useActiveResume, useResumeStore } from "@/lib/store";
 import { useUiStore } from "@/lib/focus";
 import { latexForExport } from "@/lib/latex/source";
@@ -11,6 +11,7 @@ import { downloadLatexZip, downloadText, openInOverleaf, resumeFilename, downloa
 import { printSheet } from "@/lib/export/pdf";
 import { parseResume } from "@/lib/schema";
 import type { StepId } from "@/lib/steps";
+import { ResumeUpload } from "../ResumeUpload";
 
 export function StepReview({ goTo }: { goTo: (s: StepId) => void }) {
   const r = useActiveResume();
@@ -39,6 +40,8 @@ export function StepReview({ goTo }: { goTo: (s: StepId) => void }) {
 
   return (
     <div className="grid gap-10">
+      <ResumeUpload onImported={() => goTo("review")} />
+      <ImportNotes />
       <ScoreCard score={report.score} ready={report.ready} stats={report.stats} />
 
       {report.issues.length > 0 && (
@@ -103,11 +106,11 @@ function ScoreCard({ score, ready, stats }: { score: number; ready: boolean; sta
         </h2>
         <p className="mt-1 text-sm text-ink-2">
           {ready
-            ? "Every structural check passes. Nothing here will trip Workday, Taleo, Greenhouse, Lever or iCIMS."
+            ? "The local structure checks pass. Review your details and the target job before sending."
             : "Fix the items below. Each one links to the step that changes it."}
         </p>
         <p className="mt-2 text-xs text-ink-3">
-          {stats.words} words · {stats.bullets} bullets · {stats.quantified} quantified
+          Draft structure · {stats.words} words · {stats.bullets} bullets · {stats.quantified} quantified
         </p>
       </div>
     </div>
@@ -168,23 +171,44 @@ function Passes({ passes }: { passes: { id: string; title: string }[] }) {
 
 function Keywords() {
   const r = useActiveResume();
-  const [jd, setJd] = useState("");
-  const report = useMemo(() => keywordMatch(jd, r), [jd, r]);
+  const update = useResumeStore((s) => s.update);
+  const target = r.meta.analysis;
+  const jd = useDeferredValue(target.jobDescription);
+  const keywords = useDeferredValue(target.keywords);
+  const suggested = useMemo(() => suggestKeywords(jd), [jd]);
+  const report = useMemo(() => keywordMatch(jd, r, keywords, target.source === "upload" && r.meta.imported.text ? r.meta.imported.text : undefined), [jd, r, keywords, target.source]);
+  const id = useId();
   return (
     <section className="grid gap-3">
       <div>
         <h3 className="font-display text-md font-bold">Keyword match</h3>
         <p className="mt-1 text-sm text-ink-2">
-          Paste the job posting. We pull out its recurring terms and check which ones your resume already says, word for word.
+          Paste this job’s posting, then review its suggested skills and phrases. Your target is saved with this draft.
         </p>
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-xs text-ink-2">Target job title<input className="field" value={target.jobTitle} maxLength={160} placeholder="e.g. Data analyst" onChange={(e) => update((r) => { r.meta.analysis.jobTitle = e.target.value; })} /></label>
+        <label className="grid gap-1 text-xs text-ink-2">Company<input className="field" value={target.company} maxLength={160} placeholder="Optional" onChange={(e) => update((r) => { r.meta.analysis.company = e.target.value; })} /></label>
+      </div>
+      <label htmlFor={`${id}-posting`} className="label">Job posting</label>
       <textarea
+        id={`${id}-posting`}
         className="field"
         rows={5}
-        value={jd}
-        onChange={(e) => setJd(e.target.value)}
+        value={target.jobDescription}
+        maxLength={30000}
+        onChange={(e) => update((r) => { r.meta.analysis.jobDescription = e.target.value; })}
         placeholder="Paste the job posting here…"
       />
+      <label htmlFor={`${id}-keywords`} className="label">Keywords and phrases to check</label>
+      <textarea id={`${id}-keywords`} className="field" rows={3} maxLength={3000} value={target.keywords} placeholder="e.g. SQL, financial reporting, customer service" onChange={(e) => update((r) => { r.meta.analysis.keywords = e.target.value; })} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn btn-secondary btn-sm" disabled={!suggested.length} onClick={() => update((r) => { r.meta.analysis.keywords = suggestKeywords(r.meta.analysis.jobDescription).join(", "); })}>Use suggested keywords</button>
+        <span className="text-xs text-ink-3">Comma-separated. Leave blank for automatic suggestions.</span>
+      </div>
+      {r.meta.imported.text && <label className="grid gap-1 text-xs text-ink-2">Compare against<select className="field" value={target.source} onChange={(e) => update((r) => { r.meta.analysis.source = e.target.value === "upload" ? "upload" : "draft"; })}><option value="draft">Edited draft</option><option value="upload">Uploaded resume text</option></select></label>}
+      <p className="text-xs text-ink-3">Coverage checks wording and common abbreviations. It is not an employer’s ATS score or a prediction of interview chances. Add only skills you can support.</p>
+      {!report && (target.jobDescription || target.keywords) && <p role="status" className="text-sm text-ink-2">No clear terms found yet. Add your own keywords, or paste a fuller posting.</p>}
       {report && (
         <div className="card fade-in grid gap-4 p-4">
           <div className="flex items-baseline justify-between">
@@ -219,6 +243,30 @@ function Keywords() {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+function ImportNotes() {
+  const r = useActiveResume();
+  const update = useResumeStore((s) => s.update);
+  const imported = r.meta.imported;
+  if (!imported.filename) return null;
+  return (
+    <section className="card grid min-w-0 gap-3 p-4">
+      <h3 className="font-display text-md font-bold">Import notes</h3>
+      <p className="break-all text-xs text-ink-3">From {imported.filename}. Analysis checks the new draft’s structure, not the original file’s layout.</p>
+      <ul className="list-disc space-y-1 pl-4 text-xs text-ink-2">{imported.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+      <details>
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">Original extracted text</summary>
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-ink-2">{imported.text}</pre>
+      </details>
+      {imported.unassigned && <details>
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">Unassigned text</summary>
+        <p className="mb-2 text-xs text-ink-3">Kept here for review. Copy it into the correct fields, or add it to your summary before exporting.</p>
+        <textarea aria-label="Unassigned resume text" className="field" rows={4} maxLength={100000} value={imported.unassigned} onChange={(e) => update((r) => { r.meta.imported.unassigned = e.target.value; })} />
+        <button type="button" className="btn btn-secondary btn-sm mt-2" onClick={() => update((r) => { r.summary = [r.summary, r.meta.imported.unassigned].filter(Boolean).join("\n"); r.meta.imported.unassigned = ""; })}>Add to summary</button>
+      </details>}
     </section>
   );
 }

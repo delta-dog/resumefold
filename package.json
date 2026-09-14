@@ -1,6 +1,6 @@
 {
   "name": "resumefold",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,6 +11,7 @@
     "predev": "node scripts/copy-pdf-worker.mjs",
     "prebuild": "node scripts/copy-pdf-worker.mjs",
     "check": "npm run lint && tsc --noEmit",
+    "test": "tsx --test tests/import.test.ts tests/analysis.test.ts",
     "preview": "npx serve out -l 3001",
     "tex:bundle": "node --max-old-space-size=6144 scripts/tex/build-bundle.mjs"
   },

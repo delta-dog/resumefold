@@ -17,6 +17,8 @@ import { StepExtras } from "./steps/StepExtras";
 import { StepReview } from "./steps/StepReview";
 import { DraftsMenu } from "./DraftsMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { ResumeUpload } from "./ResumeUpload";
+import { useSessionNickname } from "@/lib/session";
 
 export function Workspace() {
   const [step, setStep] = useState<StepId>("template");
@@ -26,6 +28,7 @@ export function Workspace() {
   const lift = useUiStore((s) => s.lift);
   const idx = stepIndex(step);
   const meta = STEPS[idx];
+  const nickname = useSessionNickname();
   const main = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -59,8 +62,11 @@ export function Workspace() {
             </p>
             <h1 className="mt-1 font-display text-xl font-bold leading-tight">{meta.label}</h1>
             <p className="mt-2 max-w-[52ch] text-sm text-ink-2">{meta.blurb}</p>
+            {step === "template" && nickname && <p className="mt-3 text-xs text-ink-3">Welcome, <span className="font-medium text-ink-2">{nickname}</span>. Let’s get your resume ready.</p>}
             <div className="mt-7">
-              {step === "template" && <StepTemplate />}
+              {step === "template" && <div className="grid gap-7"><ResumeUpload onImported={() => setStep("review")} /><StepTemplate onSelect={() => {
+                if (window.matchMedia("(max-width: 767px)").matches) setStep("basics");
+              }} /></div>}
               {step === "basics" && <StepBasics />}
               {step === "experience" && <StepExperience />}
               {step === "education" && <StepEducation />}

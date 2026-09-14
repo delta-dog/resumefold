@@ -28,6 +28,7 @@ type Actions = {
   update: (fn: (r: Resume) => void) => void;
   replace: (resume: Resume) => void;
   newDraft: (fromSample?: boolean) => string;
+  importDraft: (resume: Resume, name: string) => string;
   duplicateDraft: (id: string) => string;
   deleteDraft: (id: string) => void;
   renameDraft: (id: string, name: string) => void;
@@ -93,6 +94,16 @@ export const useResumeStore = create<ResumeStore>()(
         return d.id;
       },
 
+      importDraft: (resume, name) => {
+        const d = makeDraft(parseResume(resume), name);
+        set((s) => {
+          s.drafts[d.id] = d;
+          s.activeId = d.id;
+          s.saveState = "saving";
+        });
+        return d.id;
+      },
+
       duplicateDraft: (id) => {
         const src = get().drafts[id];
         const d = makeDraft(structuredClone(src.resume), `${src.name} (copy)`);
@@ -152,6 +163,7 @@ export const useResumeStore = create<ResumeStore>()(
             /* drop corrupt draft */
           }
         }
+        if (!Object.keys(drafts).length) return current;
         const activeId = p.activeId && drafts[p.activeId] ? p.activeId : Object.keys(drafts)[0];
         return { ...current, drafts, activeId };
       },

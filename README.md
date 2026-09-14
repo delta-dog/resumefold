@@ -2,7 +2,7 @@
 
 **A free, open-source resume builder. It gets you past applicant tracking systems and still sounds like you.**
 
-Type your details once, watch the page fill in live, run the ATS check, then export an ATS-friendly **PDF** or **DOCX**, or open the same resume in **Overleaf** as LaTeX. No account, no AI, no server. It's a static site; your drafts live in your browser.
+Upload an existing PDF, DOCX or TXT, or type your details once. Review the live preview, run the ATS check, then export an ATS-friendly **PDF** or **DOCX**, or open the same resume in **Overleaf** as LaTeX. No account, no AI, no server. It's a static site; your drafts live in your browser.
 
 ## Try it
 
@@ -16,11 +16,14 @@ Open http://localhost:3000. That's the whole setup.
 ```bash
 npm run build         # static site → ./out  (deploy anywhere: GitHub Pages, Netlify, Vercel, S3)
 npm run check         # lint + typecheck
+npm test              # import, matching and draft persistence checks
 npm run tex:bundle    # build the in-browser TeX engine bundle into public/tex/ (one-time, ~250 MB download, cached)
 ```
 
 ## What it does
 
+- **Local resume uploads:** PDF, DOCX and TXT extraction into a new draft, with editable text, import notes and a comparison against the original uploaded text. [Limits and matching rules](docs/resume-import.md).
+- **Saved job targets:** job descriptions and editable keywords stay with each draft across steps and JSON backups. A playful session nickname stays out of resume exports.
 - **Live preview** of a real Letter/A4 sheet as you type, with the field you're editing spotlighted on the page.
 - **Four single-column layouts** (Standard, Student, Combination, Senior), each tunable: typeface pairing, size, margins, line spacing, accent colour, custom CSS.
 - **ATS checker** that names the problem ("Role 2 is missing an end date", "three bullets open with *responsible for*") and links each finding to the field that fixes it. Paste a job description for a verbatim keyword-gap list.

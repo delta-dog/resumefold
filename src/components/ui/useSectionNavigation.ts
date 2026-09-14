@@ -30,7 +30,8 @@ export function useSectionNavigation(items: NavItem[]) {
         top: element.getBoundingClientRect().top + y,
         margin: parseFloat(getComputedStyle(element).scrollMarginTop) || 96,
       })).sort((a, b) => a.top - b.top);
-      activationTop = positions[0].margin + 16;
+      const margin = positions[0].margin;
+      activationTop = margin + Math.min(240, (window.innerHeight - margin) * 0.25);
       maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       needsMeasure = false;
     };
@@ -40,9 +41,14 @@ export function useSectionNavigation(items: NavItem[]) {
       if (pending) return;
       const y = Math.max(0, window.scrollY);
       let current: string | null = null;
-      for (const section of positions) {
-        if (section.top > y + activationTop) break;
-        current = section.href;
+      let previousTop: number | null = null;
+      const margin = positions[0].margin;
+      // Read live bounds so expanded content and font loading cannot stale the tracker.
+      for (const section of sections) {
+        const top = section.element.getBoundingClientRect().top;
+        const threshold = previousTop === null ? activationTop : margin + Math.min(activationTop - margin, Math.max(0, top - previousTop) / 2);
+        if (top <= threshold) current = section.href;
+        previousTop = top;
       }
       if (maxScroll > 0 && y >= maxScroll - 2) current = positions.at(-1)!.href;
       setActiveHref(current);
@@ -86,7 +92,7 @@ export function useSectionNavigation(items: NavItem[]) {
         return Math.max(0, Math.min(maxScroll, position.top - position.margin));
       };
       const target = destination();
-      const duration = Math.min(800, 350 + Math.abs(target - start) * 0.08);
+      const duration = Math.min(1200, 350 + Math.sqrt(Math.abs(target - start)) * 14);
       const finish = () => {
         animation = 0;
         cancelAnimationFrame(frame);
@@ -111,7 +117,7 @@ export function useSectionNavigation(items: NavItem[]) {
       const started = performance.now();
       const tick = (now: number) => {
         const progress = Math.min(1, (now - started) / duration);
-        const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+        const eased = progress * progress * (3 - 2 * progress);
         window.scrollTo({ top: start + (destination() - start) * eased, behavior: "instant" });
         if (progress < 1) animation = requestAnimationFrame(tick);
         else finish();
@@ -132,8 +138,10 @@ export function useSectionNavigation(items: NavItem[]) {
     window.addEventListener("wheel", interrupt, { passive: true });
     window.addEventListener("pointerdown", interrupt, { passive: true });
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("popstate", interrupt);
-    window.addEventListener("hashchange", interrupt);
+    const onHistory = () => { cancelMotion(); onLayout(); };
+    window.addEventListener("touchstart", interrupt, { passive: true });
+    window.addEventListener("popstate", onHistory);
+    window.addEventListener("hashchange", onHistory);
     reducedMotion.addEventListener("change", interrupt);
     return () => {
       cancelAnimationFrame(frame);
@@ -145,8 +153,9 @@ export function useSectionNavigation(items: NavItem[]) {
       window.removeEventListener("wheel", interrupt);
       window.removeEventListener("pointerdown", interrupt);
       window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("popstate", interrupt);
-      window.removeEventListener("hashchange", interrupt);
+      window.removeEventListener("touchstart", interrupt);
+      window.removeEventListener("popstate", onHistory);
+      window.removeEventListener("hashchange", onHistory);
       reducedMotion.removeEventListener("change", interrupt);
     };
   }, [sectionKey]);

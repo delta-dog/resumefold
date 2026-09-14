@@ -7,7 +7,7 @@ import { StylePanel } from "../StylePanel";
 import { sampleResume } from "@/lib/sample";
 import { sectionHasContent } from "@/lib/schema";
 
-export function StepTemplate() {
+export function StepTemplate({ onSelect }: { onSelect: () => void }) {
   const r = useActiveResume();
   const update = useResumeStore((s) => s.update);
   // Thumbnails render your data — unless the resume is still empty, then the sample.
@@ -30,12 +30,13 @@ export function StepTemplate() {
               <button
                 key={t.id}
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   update((d) => {
                     d.meta.template = t.id;
                     d.meta.sectionOrder = t.sectionOrder;
-                  })
-                }
+                  });
+                  onSelect();
+                }}
                 aria-pressed={active}
                 className={`group grid min-w-0 gap-3 rounded-card p-3 text-left transition-colors duration-200 ${
                   active ? "bg-signal-soft ring-2 ring-signal" : "bg-paper-2 hover:bg-paper-3"
@@ -89,15 +90,16 @@ export function StepTemplate() {
               <button
                 key={t.id}
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   update((d) => {
                     if (d.meta.latexStyle !== t.id) {
                       d.meta.latexSource = "";
                       d.meta.latexSourceStyle = undefined;
                     }
                     d.meta.latexStyle = t.id;
-                  })
-                }
+                  });
+                  onSelect();
+                }}
                 aria-pressed={active}
                 className={`group grid min-w-0 gap-3 rounded-card p-3 text-left transition-colors duration-200 ${
                   active ? "bg-signal-soft ring-2 ring-signal" : "bg-paper-2 hover:bg-paper-3"

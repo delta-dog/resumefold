@@ -102,6 +102,19 @@ export const StyleSchema = z.object({
 });
 
 export const MetaSchema = z.object({
+  analysis: z.object({
+    jobTitle: z.string().max(160).default(""),
+    company: z.string().max(160).default(""),
+    jobDescription: z.string().max(30000).default(""),
+    keywords: z.string().max(3000).default(""),
+    source: z.enum(["draft", "upload"]).default("draft"),
+  }).prefault({}),
+  imported: z.object({
+    filename: z.string().default(""),
+    text: z.string().max(100000).default(""),
+    unassigned: z.string().max(100000).default(""),
+    warnings: z.array(z.string()).default([]),
+  }).prefault({}),
   template: z.enum(HTML_TEMPLATE_IDS).default("standard"),
   latexStyle: z.enum(LATEX_STYLE_IDS).default("classic"),
   /** Explicit section order; sections not listed are appended in default order. */

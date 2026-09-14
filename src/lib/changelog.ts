@@ -8,6 +8,18 @@ export const CHANGELOG: ChangelogMonth[] = [
     month: "2026-09",
     entries: [
       {
+        version: "0.3.0",
+        date: "2026-09-14",
+        changes: [
+          "Added local PDF, DOCX and TXT resume uploads with editable extracted text, new drafts and import notes.",
+          "Saved job targets, postings, keywords and comparison sources with each draft, including JSON backups.",
+          "Improved job-specific matching for phrases, common abbreviations and whole terms, with an option to analyse the original uploaded text.",
+          "Added a playful nickname that stays with the browser session and never appears in exported resumes.",
+          "Made mobile template selection advance directly to Basics.",
+          "Improved navbar section tracking during scrolling and softened long section transitions.",
+        ],
+      },
+      {
         version: "0.2.2",
         date: "2026-09-13",
         changes: [
