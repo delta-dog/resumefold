@@ -1,5 +1,6 @@
 import { loadPdfJs } from "@/lib/pdf";
 import { ResumeReadError, type ImportStage } from "./errors";
+import { readPdfPageText } from "./pdf-text";
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_TEXT_LENGTH = 100000;
@@ -132,20 +133,25 @@ function docxText(xml: string) {
   }).join("\n");
 }
 
-export async function extractResumeText(file: File, signal: AbortSignal): Promise<string> {
+export type ImportProgress = { label: string; page?: number; totalPages?: number };
+
+export async function extractResumeText(file: File, signal: AbortSignal, onProgress?: (progress: ImportProgress) => void): Promise<string> {
   const extension = validateResumeFile(file);
   let stage: ImportStage = "file-read";
   try {
+    onProgress?.({ label: "Opening file…" });
     const buffer = await readFileBytes(file, signal);
     checkAborted(signal);
     if (extension === "txt") { stage = "text-decode"; return checkText(new TextDecoder("utf-8", { fatal: true }).decode(buffer)); }
     if (extension === "docx") {
       stage = "docx-read";
+      onProgress?.({ label: "Reading document…" });
       const xml = await readDocxXml(buffer, signal);
       checkAborted(signal);
       return checkText(docxText(xml));
     }
     stage = "pdf-load";
+    onProgress?.({ label: "Opening PDF…" });
     if (new TextDecoder().decode(buffer.slice(0, 5)) !== "%PDF-") throw new Error("This is not a valid PDF file.");
     const pdfjs = await loadPdfJs();
     checkAborted(signal);
@@ -160,22 +166,10 @@ export async function extractResumeText(file: File, signal: AbortSignal): Promis
       let length = 0;
       for (let i = 1; i <= pdf.numPages; i++) {
         checkAborted(signal);
+        onProgress?.({ label: `Reading page ${i} of ${pdf.numPages}…`, page: i, totalPages: pdf.numPages });
         const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const lines: string[] = [];
-        let line = "";
-        let y: number | null = null;
-        for (const item of content.items) {
-          if (!("str" in item)) continue;
-          const nextY = item.transform[5];
-          if (y !== null && Math.abs(nextY - y) > 3 && line.trim()) { lines.push(line.trim()); line = ""; }
-          line += `${line && !line.endsWith(" ") ? " " : ""}${item.str}`;
-          y = nextY;
-          if (item.hasEOL) { lines.push(line.trim()); line = ""; y = null; }
-        }
-        if (line.trim()) lines.push(line.trim());
-        const text = lines.join("\n");
-        length += text.length;
+        const text = await readPdfPageText(page, signal, MAX_TEXT_LENGTH - length);
+        length += text.length + (i > 1 ? 2 : 0);
         if (length > MAX_TEXT_LENGTH) throw new Error("This PDF has too much text. Choose a shorter resume.");
         pages.push(text);
         page.cleanup();

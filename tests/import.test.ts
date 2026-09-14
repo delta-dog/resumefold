@@ -7,6 +7,8 @@ import { installPdfCompatibility } from "../src/lib/pdf-compat.mjs";
 import { parseImportDate, parseResumeText } from "../src/lib/import/parse";
 import { MAX_FILE_BYTES, extractResumeText, readDocxXml, readFileBytes, validateResumeFile, validateDocxArchive } from "../src/lib/import/extract";
 import { ResumeReadError } from "../src/lib/import/errors";
+import { readPdfPageText } from "../src/lib/import/pdf-text";
+import type { TextContent } from "pdfjs-dist/types/src/display/api";
 
 export const RESUME_TEXT = `Alex Morgan
 Software Engineer
@@ -116,7 +118,7 @@ test("retains useful failure stages and distinguishes invalid text from compatib
   });
 });
 
-test("reads actual PDF uploads without Safari 17.4+ APIs in the page and isolated worker", () => {
+test("reproduces Safari stream iteration failure and reads the same PDF with explicit readers", () => {
   const copied = spawnSync(process.execPath, ["scripts/copy-pdf-worker.mjs"], { encoding: "utf8" });
   assert.equal(copied.status, 0, copied.stderr);
   const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `
@@ -128,6 +130,8 @@ test("reads actual PDF uploads without Safari 17.4+ APIs in the page and isolate
     Promise.withResolvers = undefined;
     ArrayBuffer.prototype.transferToFixedLength = undefined;
     URL.parse = undefined;
+    delete ReadableStream.prototype[Symbol.asyncIterator];
+    delete ReadableStream.prototype.values;
     globalThis.DOMMatrix = class DOMMatrix {};
     globalThis.Path2D = class Path2D {};
     const pdfjs = await loadPdfJs();
@@ -146,8 +150,15 @@ test("reads actual PDF uploads without Safari 17.4+ APIs in the page and isolate
     const workerUrl = new URL("./public" + pdfjs.GlobalWorkerOptions.workerSrc, import.meta.url).href;
     pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
     const file = new File([Buffer.from(process.argv[1], "base64")], "resume.pdf", {type:"application/pdf"});
-    const text = await extractResumeText(file, new AbortController().signal);
+    const broken = pdfjs.getDocument({data: Uint8Array.from(Buffer.from(process.argv[1], "base64"))});
+    try {
+      const doc = await broken.promise;
+      await assert.rejects((await doc.getPage(1)).getTextContent(), TypeError);
+    } finally { await broken.destroy(); }
+    const progress = [];
+    const text = await extractResumeText(file, new AbortController().signal, value => progress.push(value));
     assert.match(text.replace(/\\s+/g," "), /John Doe.*Python SQL/);
+    assert.ok(progress.some(value => value.page === 1 && value.totalPages === 1));
     const worker = new Worker(
       'const {parentPort} = require("node:worker_threads");' +
       'Promise.withResolvers = undefined; ArrayBuffer.prototype.transferToFixedLength = undefined; globalThis.Iterator = undefined;' +
@@ -160,6 +171,35 @@ test("reads actual PDF uploads without Safari 17.4+ APIs in the page and isolate
     await worker.terminate();
   `, Buffer.from(resumePdf()).toString("base64")], { encoding: "utf8", timeout: 15000 });
   assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+function textChunk(text: string, y: number, end = false): TextContent {
+  return { items: [{ str: text, dir: "ltr", transform: [1, 0, 0, 1, 0, y], width: text.length, height: 10, fontName: "fixture", hasEOL: end }], styles: {}, lang: null };
+}
+
+test("preserves lines across streamed PDF chunks and bounds text before accumulating it", async () => {
+  const stream = new ReadableStream<TextContent>({ start(controller) {
+    controller.enqueue(textChunk("John", 700));
+    controller.enqueue(textChunk("Doe", 700, true));
+    controller.enqueue(textChunk("Python SQL", 680));
+    controller.close();
+  } });
+  assert.equal(await readPdfPageText({ streamTextContent: () => stream }, new AbortController().signal, 100), "John Doe\nPython SQL");
+  assert.equal(stream.locked, false);
+  let cancelled = false;
+  const oversized = new ReadableStream<TextContent>({ start(controller) { controller.enqueue(textChunk("x".repeat(200), 0)); }, cancel() { cancelled = true; } });
+  await assert.rejects(readPdfPageText({ streamTextContent: () => oversized }, new AbortController().signal, 100), /too much text/);
+  assert.equal(cancelled, true); assert.equal(oversized.locked, false);
+});
+
+test("cancels a pending PDF stream read and releases its lock", async () => {
+  const request = new AbortController();
+  let cancelled = false;
+  const stream = new ReadableStream<TextContent>({ cancel() { cancelled = true; } });
+  const reading = readPdfPageText({ streamTextContent: () => stream }, request.signal, 100);
+  request.abort(new Error("cancelled"));
+  await assert.rejects(reading, /cancelled/);
+  assert.equal(cancelled, true); assert.equal(stream.locked, false);
 });
 
 test("reads native file-picker bytes and cleans up cancellation and provider failures", async () => {

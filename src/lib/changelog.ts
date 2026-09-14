@@ -8,6 +8,16 @@ export const CHANGELOG: ChangelogMonth[] = [
     month: "2026-09",
     entries: [
       {
+        version: "0.3.3",
+        date: "2026-09-14",
+        changes: [
+          "Rebuilt resume import with explicit PDF stream reads to avoid Safari's unsupported stream iteration.",
+          "Simplified mobile uploads into choose, progress and review steps, with retry and change-file controls.",
+          "Bounded text processing per chunk and cancelled pending PDF reads without retaining their stream locks.",
+          "Added a regression test that reproduces the Safari failure and verifies extraction from the same PDF.",
+        ],
+      },
+      {
         version: "0.3.2",
         date: "2026-09-14",
         changes: [
